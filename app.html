@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Silkscreen math - frames, ink and print runs</title>
+<style>
+  :root { --ink:#241a2b; --accent:#6d28a8; --paper:#f8f5fa; --card:#ffffff; --line:#e2d8ea; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: Georgia, 'Times New Roman', serif; background:var(--paper); color:var(--ink); }
+  header { padding:2rem 1.25rem 1rem; max-width:960px; margin:0 auto; }
+  h1 { font-size:1.9rem; margin:0 0 .35rem; }
+  header p { margin:.25rem 0; color:#53445e; max-width:46rem; line-height:1.45; }
+  .norms { font-size:.9rem; color:#5f4e6b; margin-top:.6rem; }
+  main { max-width:960px; margin:0 auto; padding:0 1.25rem 3rem; display:grid; gap:1.25rem; }
+  @media (min-width:820px){ main { grid-template-columns:1fr 1fr 1fr; } }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:1.1rem 1.1rem 1.25rem; }
+  .card h2 { font-size:1.15rem; margin:.1rem 0 .5rem; }
+  .card p.desc { font-size:.9rem; color:#5f4e6b; margin:.2rem 0 .8rem; line-height:1.4; }
+  label { display:block; font-size:.85rem; margin:.55rem 0 .15rem; color:#453655; }
+  input { width:100%; padding:.45rem .5rem; font-size:1rem; border:1px solid var(--line); border-radius:6px; font-family:inherit; }
+  button { margin-top:.8rem; width:100%; padding:.55rem; font-size:1rem; font-family:inherit; background:var(--accent); color:#fff; border:0; border-radius:6px; cursor:pointer; }
+  button:hover { background:#5a1f8c; }
+  .out { margin-top:.9rem; font-size:.95rem; line-height:1.5; min-height:3.2rem; }
+  .out .big { font-size:1.35rem; font-weight:bold; }
+  .band { display:inline-block; margin-top:.35rem; padding:.15rem .55rem; border-radius:999px; background:#efe3f7; color:#57208a; font-size:.82rem; }
+  .err { color:#a02323; }
+  footer { max-width:960px; margin:0 auto; padding:0 1.25rem 2.5rem; font-size:.85rem; color:#6d5d78; }
+  a { color:var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Silkscreen math</h1>
+  <p>Every poster run dies in the screen room: a frame that almost fits, ink that runs out at print 27, and no honest time plan. Three small calculators for exactly those moments - exact arithmetic, every borrowed number labeled.</p>
+  <p class="norms">Labeled norms: 8 cm squeegee margin each side; standard frames 25&times;35, 30&times;40, 40&times;50, 50&times;70 cm; ink coverage ~9 m&sup2; per kg (water-based, standard mesh) with 20% waste; 20 s per pull, 15 min setup per screen, 10 min dry gap between colors.</p>
+</header>
+<main>
+  <section class="card" id="frame">
+    <h2>Frame fit</h2>
+    <p class="desc">Image size in, smallest standard frame out - with orientation and spare margin.</p>
+    <label for="f-w">Image width (cm)</label>
+    <input id="f-w" type="number" step="0.1" min="0" value="20">
+    <label for="f-h">Image height (cm)</label>
+    <input id="f-h" type="number" step="0.1" min="0" value="28">
+    <button id="f-go">Fit the frame</button>
+    <div class="out" id="f-out"></div>
+  </section>
+
+  <section class="card" id="ink">
+    <h2>Ink estimate</h2>
+    <p class="desc">How much ink a run actually drinks, at labeled coverage and waste norms.</p>
+    <label for="i-w">Print width (cm)</label>
+    <input id="i-w" type="number" step="0.1" min="0" value="20">
+    <label for="i-h">Print height (cm)</label>
+    <input id="i-h" type="number" step="0.1" min="0" value="28">
+    <label for="i-c">Colors</label>
+    <input id="i-c" type="number" step="1" min="1" max="12" value="2">
+    <label for="i-n">Prints</label>
+    <input id="i-n" type="number" step="1" min="1" value="30">
+    <button id="i-go">Weigh the ink</button>
+    <div class="out" id="i-out"></div>
+  </section>
+
+  <section class="card" id="run">
+    <h2>Run planner</h2>
+    <p class="desc">Setups, pulls and dry gaps added up into honest wall-clock time.</p>
+    <label for="r-n">Prints</label>
+    <input id="r-n" type="number" step="1" min="1" value="30">
+    <label for="r-c">Colors</label>
+    <input id="r-c" type="number" step="1" min="1" max="12" value="2">
+    <label for="r-p">Seconds per pull</label>
+    <input id="r-p" type="number" step="1" min="1" value="20">
+    <label for="r-s">Setup per screen (min)</label>
+    <input id="r-s" type="number" step="1" min="0" value="15">
+    <label for="r-d">Dry gap between colors (min)</label>
+    <input id="r-d" type="number" step="1" min="0" value="10">
+    <button id="r-go">Plan the run</button>
+    <div class="out" id="r-out"></div>
+  </section>
+</main>
+<footer>
+  Built by the app factory. <a href="index.html">About</a> &middot; <a href="https://github.com/iLanis-agent/silkscreenmath">Source</a>
+</footer>
+<script src="engine.js"></script>
+<script>
+(function () {
+  'use strict';
+  var M = window.SilkscreenMath;
+  function $(id){ return document.getElementById(id); }
+  function num(id){ return parseFloat($(id).value); }
+  function show(el, html){ el.classList.remove('err'); el.innerHTML = html; }
+  function fail(el, msg){ el.classList.add('err'); el.textContent = msg; }
+
+  $('f-go').addEventListener('click', function () {
+    var out = $('f-out');
+    try {
+      var r = M.frameFit(num('f-w'), num('f-h'));
+      if (!r.frame) {
+        show(out, '<span class="big">No fit.</span><br><span class="band">' + r.verdict + '</span>');
+      } else {
+        show(out, '<span class="big">' + r.frame + ' cm</span> ' + r.orientation +
+          '<br>' + r.spare_w + ' x ' + r.spare_h + ' cm spare' +
+          '<br><span class="band">' + r.verdict + '</span>');
+      }
+    } catch (e) { fail(out, e.message); }
+  });
+
+  $('i-go').addEventListener('click', function () {
+    var out = $('i-out');
+    try {
+      var r = M.inkGrams(num('i-w'), num('i-h'), num('i-c'), num('i-n'));
+      show(out, '<span class="big">' + r.grams + ' g</span> of ink' +
+        '<br><span class="band">' + r.verdict + '</span>');
+    } catch (e) { fail(out, e.message); }
+  });
+
+  $('r-go').addEventListener('click', function () {
+    var out = $('r-out');
+    try {
+      var r = M.runMinutes(num('r-n'), num('r-c'), num('r-p'), num('r-s'), num('r-d'));
+      var h = Math.floor(r.minutes / 60), m = Math.round((r.minutes % 60) * 10) / 10;
+      show(out, '<span class="big">' + r.minutes + ' min</span>' +
+        (h > 0 ? '<br>about ' + h + ' h' + (m ? ' ' + m + ' min' : '') : '') +
+        '<br><span class="band">' + r.verdict + '</span>');
+    } catch (e) { fail(out, e.message); }
+  });
+})();
+</script>
+</body>
+</html>
